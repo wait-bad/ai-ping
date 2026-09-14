@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Ping · 模型首字测速</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- 左侧：接口列表 -->
+    <aside id="sidebar">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-info">
+          <h1>AI Ping</h1>
+          <p>模型首字测速台</p>
+        </div>
+        <button id="btn-open-settings" class="icon-btn" title="全局设置">⚙</button>
+      </div>
+      <div class="ep-head">
+        <span>API 接口</span>
+        <button id="btn-add-ep" class="mini-btn" title="新增接口">＋ 新增</button>
+      </div>
+      <ul id="ep-list" class="ep-list"></ul>
+      <div class="side-foot">极速首字探测 · 支持推理模型<br />流式 SSE · 首字即停</div>
+    </aside>
+
+    <!-- 右侧：模型测速区 -->
+    <main id="main">
+      <div id="empty-state" class="empty hidden">
+        <div class="empty-emoji">🛰️</div>
+        <h2>还没有 API 接口</h2>
+        <p>点击左侧「＋ 新增」，填上名称、URL、Key 和模型名就可以开测啦。</p>
+      </div>
+
+      <section id="work" class="hidden">
+        <header class="work-head">
+          <div class="work-title">
+            <h2 id="work-title"></h2>
+            <div class="work-meta">
+              <code id="work-url"></code>
+              <span id="work-key" class="keytag"></span>
+            </div>
+          </div>
+          <div class="work-actions">
+            <button id="btn-copy-ep" class="ghost-btn" title="复制当前接口配置（继承URL与名称，API Key与模型置空）">⎘ 复制新建</button>
+            <button id="btn-edit" class="ghost-btn">✎ 编辑</button>
+            <button id="btn-ping-all" class="primary-btn">▶ 全部测速</button>
+          </div>
+        </header>
+
+        <div class="toolbar">
+          <label class="chk"><input type="checkbox" id="chk-all" checked /> 全选</label>
+          <span id="sel-count" class="dim"></span>
+          <div class="stats" id="stats"></div>
+        </div>
+
+        <div id="models" class="models"></div>
+      </section>
+    </main>
+
+    <!-- 右下角淡淡的花字体标识 -->
+    <div class="watermark-brand" aria-hidden="true">WaitB</div>
+  </div>
+
+  <!-- 接口编辑弹层 -->
+  <div id="modal-mask" class="modal-mask hidden">
+    <div class="modal">
+      <h3 id="modal-title">新增接口</h3>
+      <label class="fld"><span>接口名称</span><input id="f-name" placeholder="例如：OpenRouter" /></label>
+      <label class="fld"><span>API URL（OpenAI 协议 Base，如 https://api.openai.com/v1）</span>
+        <input id="f-url" placeholder="https://xxx.com/v1" /></label>
+      <label class="fld"><span>API Key</span><input id="f-key" type="password" placeholder="sk-..." /></label>
+      <label class="fld"><span>模型列表（一行一个，也可用逗号分隔）</span>
+        <textarea id="f-models" rows="6" placeholder="gpt-4o-mini&#10;claude-3-5-sonnet-20241022&#10;deepseek-chat&#10;deepseek-reasoner"></textarea></label>
+      <div class="modal-btns">
+        <button id="btn-cancel" class="ghost-btn">取消</button>
+        <button id="btn-delete" class="danger-btn hidden">删除</button>
+        <button id="btn-save" class="primary-btn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 全局设置弹层 -->
+  <div id="settings-mask" class="modal-mask hidden">
+    <div class="modal">
+      <h3>全局设置</h3>
+      <label class="fld">
+        <span>测速超时时间（秒）</span>
+        <input id="f-timeout" type="number" min="3" max="300" placeholder="默认 30" />
+      </label>
+      <label class="fld">
+        <span>失败重试次数</span>
+        <input id="f-retry" type="number" min="0" max="5" placeholder="默认 1 次（0 为不重试）" />
+      </label>
+      <div class="settings-hint">
+        💡 测速时若在超时时间内未收到首字或网络抖动中断，将自动执行重试并在卡片上完整提示失败原因。
+      </div>
+      <div class="modal-btns">
+        <button id="btn-settings-cancel" class="ghost-btn">取消</button>
+        <button id="btn-settings-save" class="primary-btn">保存设置</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
