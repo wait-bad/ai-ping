@@ -13,6 +13,10 @@ let liveTimer = null;        // 实时秒表刷新定时器
 let appSettings = { timeoutSecs: 30, retryCount: 1 }; // 全局设置
 const selByEp = {};          // { [epId]: Set } 勾选记忆
 
+// 时间同步与网络状态
+let timeOffsetMs = 0;        // network_time - local_time
+let lastSyncTime = 0;
+
 const $ = (s) => document.querySelector(s);
 const el = {
   epList: $("#ep-list"), empty: $("#empty-state"), work: $("#work"),
@@ -30,6 +34,13 @@ const el = {
   fRetry: $("#f-retry"),
   btnSettingsCancel: $("#btn-settings-cancel"),
   btnSettingsSave: $("#btn-settings-save"),
+  // 时间与网络诊断元素
+  localClock: $("#local-clock"),
+  networkClock: $("#network-clock"),
+  timeOffset: $("#time-offset"),
+  btnSyncTime: $("#btn-sync-time"),
+  btnTestNet: $("#btn-test-net"),
+  localNetPing: $("#local-net-ping"),
 };
 
 const cur = () => endpoints.find((e) => e.id === currentId) || null;
@@ -41,6 +52,8 @@ const api = {
   getSettings: () => invoke("get_settings"),
   saveSettings: (settings) => invoke("save_settings_cmd", { settings }),
   ping: (endpoint, models) => invoke("ping_models", { endpoint, models }),
+  getNetworkTime: () => invoke("get_network_time"),
+  testLocalPing: () => invoke("test_local_network_ping"),
 };
 
 // 监听后端推送的单个模型测速完成事件，立刻更新单个卡片
@@ -77,6 +90,13 @@ function grade(ms) {
 function fmt(ms) {
   if (ms == null) return "—";
   return ms >= 10000 ? (ms / 1000).toFixed(1) + "s" : Math.round(ms) + "";
+}
+
+function formatClock(date) {
+  const h = String(date.getHours()).padStart(2, "0");
+  const m = String(date.getMinutes()).padStart(2, "0");
+  const s = String(date.getSeconds()).padStart(2, "0");
+  return `${h}:${m}:${s}`;
 }
 
 // ---------- 渲染：侧栏 ----------
@@ -285,6 +305,58 @@ function setRunning(v) {
   }
 }
 
+// ---------- 时间同步与时钟轮询 ----------
+function startClockTicker() {
+  setInterval(() => {
+    const now = Date.now();
+    const localD = new Date(now);
+    const netD = new Date(now + timeOffsetMs);
+    el.localClock.textContent = formatClock(localD);
+    el.networkClock.textContent = formatClock(netD);
+  }, 500);
+}
+
+async function syncNetworkTime() {
+  el.btnSyncTime.disabled = true;
+  el.btnSyncTime.textContent = "… 同步中";
+  try {
+    const info = await api.getNetworkTime();
+    timeOffsetMs = info.offsetMs || 0;
+    lastSyncTime = Date.now();
+    const absOffset = Math.abs(timeOffsetMs);
+    el.timeOffset.className = "diff-val " + (absOffset < 300 ? "ok" : absOffset < 1500 ? "warn" : "bad");
+    el.timeOffset.textContent = (timeOffsetMs >= 0 ? "+" : "") + timeOffsetMs + " ms";
+  } catch (e) {
+    el.timeOffset.className = "diff-val bad";
+    el.timeOffset.textContent = "获取失败";
+  } finally {
+    el.btnSyncTime.disabled = false;
+    el.btnSyncTime.textContent = "🔄 校准时间";
+  }
+}
+
+async function testLocalPing() {
+  el.btnTestNet.disabled = true;
+  el.btnTestNet.textContent = "… 测速中";
+  el.localNetPing.classList.remove("hidden");
+  el.localNetPing.textContent = "···";
+  try {
+    const res = await api.testLocalPing();
+    if (res.ok && res.latencyMs != null) {
+      el.localNetPing.textContent = res.latencyMs + " ms";
+      el.localNetPing.className = "ping-badge";
+    } else {
+      el.localNetPing.textContent = "超时/失败";
+      el.localNetPing.className = "ping-badge bad";
+    }
+  } catch (e) {
+    el.localNetPing.textContent = "失败";
+  } finally {
+    el.btnTestNet.disabled = false;
+    el.btnTestNet.textContent = "⚡ 测本地延迟";
+  }
+}
+
 // ---------- 弹层（编辑接口） ----------
 let editingId = null;
 
@@ -334,7 +406,7 @@ async function saveModal() {
   await api.save(list);
   endpoints = list;
   currentId = editingId || list[list.length - 1].id;
-  selByEp[currentId] = selByEp[currentId] || new Set(cur().models);
+  selByEp[currentId] = new Set(cur().models);
   results = {};
   startTimes = {};
   uiElapsed = {};
@@ -408,6 +480,10 @@ el.btnSettingsCancel.onclick = closeSettings;
 el.btnSettingsSave.onclick = saveSettings;
 el.settingsMask.onclick = (e) => e.target === el.settingsMask && closeSettings();
 
+// 时间与网络诊断事件
+el.btnSyncTime.onclick = syncNetworkTime;
+el.btnTestNet.onclick = testLocalPing;
+
 el.chkAll.onchange = () => {
   const ep = cur();
   if (!ep) return;
@@ -422,7 +498,11 @@ el.chkAll.onchange = () => {
 el.pingAll.onclick = () => {
   const ep = cur();
   if (!ep) return;
-  const sel = [...(selByEp[ep.id] || [])];
+  // 确保如果当前接口没有初始化勾选集，则默认全选全部模型
+  if (!selByEp[ep.id] || selByEp[ep.id].size === 0) {
+    selByEp[ep.id] = new Set(ep.models);
+  }
+  const sel = [...selByEp[ep.id]];
   startPing(sel.length ? sel : ep.models);
 };
 
@@ -438,4 +518,7 @@ el.pingAll.onclick = () => {
   }
   renderSidebar();
   renderWork();
+  startClockTicker();
+  syncNetworkTime();
+  testLocalPing();
 })();

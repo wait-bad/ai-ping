@@ -23,7 +23,31 @@
         <button id="btn-add-ep" class="mini-btn" title="新增接口">＋ 新增</button>
       </div>
       <ul id="ep-list" class="ep-list"></ul>
-      <div class="side-foot">极速首字探测 · 支持推理模型<br />流式 SSE · 首字即停</div>
+      
+      <!-- 左下角状态栏与时间/网络诊断区 -->
+      <div class="side-status-box">
+        <div class="time-row">
+          <div class="time-item">
+            <span class="time-lbl">本地时间</span>
+            <span id="local-clock" class="time-val local-time">--:--:--</span>
+          </div>
+          <div class="time-item">
+            <span class="time-lbl">网络标准时间</span>
+            <span id="network-clock" class="time-val net-time">--:--:--</span>
+          </div>
+        </div>
+
+        <div class="time-diff-row">
+          <span class="diff-lbl">时间偏差:</span>
+          <span id="time-offset" class="diff-val">检测中…</span>
+        </div>
+
+        <div class="diag-action-row">
+          <button id="btn-sync-time" class="diag-btn" title="获取权威网络时间并计算本地时钟偏差">🔄 校准时间</button>
+          <button id="btn-test-net" class="diag-btn" title="测试本地到公共核心 DNS 网关的真实网络延迟">⚡ 测本地延迟</button>
+          <span id="local-net-ping" class="ping-badge hidden">-- ms</span>
+        </div>
+      </div>
     </aside>
 
     <!-- 右侧：模型测速区 -->

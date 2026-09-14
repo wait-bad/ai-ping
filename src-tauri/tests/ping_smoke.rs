@@ -89,6 +89,37 @@ async fn first_char_timing_over_real_sse() {
 }
 
 #[tokio::test]
+async fn multiple_models_concurrent_ping() {
+    let port = spawn_sse_server();
+    let ep = Endpoint {
+        id: "multi_ep".into(),
+        name: "local_multi".into(),
+        base_url: format!("http://127.0.0.1:{port}/v1"),
+        api_key: "sk-test".into(),
+        models: vec!["m1".into(), "m2".into(), "m3".into()],
+    };
+    let client = reqwest::Client::new();
+    let models = vec!["m1".to_string(), "m2".to_string(), "m3".to_string()];
+    let mut set = tokio::task::JoinSet::new();
+    for m in models {
+        let c = client.clone();
+        let e = ep.clone();
+        set.spawn(async move { ping_one(&c, &e, &m, 30, 1).await });
+    }
+    let mut results = Vec::new();
+    while let Some(res) = set.join_next().await {
+        if let Ok(r) = res {
+            results.push(r);
+        }
+    }
+    assert_eq!(results.len(), 3);
+    for r in results {
+        assert!(r.ok);
+        assert_eq!(r.sample, "ok");
+    }
+}
+
+#[tokio::test]
 async fn retry_success_captures_attempts_and_overall_ms() {
     let port = spawn_fail_then_success_server();
     let ep = Endpoint {

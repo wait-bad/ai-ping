@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use futures_util::StreamExt;
 use parking_lot::Mutex;
@@ -55,6 +55,29 @@ pub struct PingResult {
     pub attempts: u32,
     /// 首个可见输出片段
     pub sample: String,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkTimeInfo {
+    /// 权威网络时间戳 (毫秒)
+    pub network_timestamp: u64,
+    /// 测得网络时间时的本地时间戳 (毫秒)
+    pub local_timestamp: u64,
+    /// 时间偏差 (毫秒): network_timestamp - local_timestamp (正数表示本地慢了，负数表示本地快了)
+    pub offset_ms: i64,
+    /// 获取网络时间的单程往返 RTT (毫秒)
+    pub rtt_ms: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalPingInfo {
+    pub ok: bool,
+    /// 本地到公共核心 DNS/网关的延迟 (ms)
+    pub latency_ms: Option<u64>,
+    pub target: String,
     pub error: Option<String>,
 }
 
@@ -437,6 +460,89 @@ pub async fn ping_one(
     last_res
 }
 
+// ---------- 网络时间与本地时间探测 ----------
+
+fn now_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+#[tauri::command]
+async fn get_network_time(app: AppHandle) -> Result<NetworkTimeInfo, String> {
+    let client = app.state::<HttpState>().client().clone();
+    let t0 = Instant::now();
+    let local_t0 = now_millis();
+
+    let resp = client
+        .head("https://www.cloudflare.com/cdn-cgi/trace")
+        .timeout(Duration::from_secs(5))
+        .send()
+        .await
+        .map_err(|e| format!("获取网络时间失败: {e}"))?;
+
+    let rtt = t0.elapsed().as_millis() as u64;
+    let local_mid = local_t0 + rtt / 2;
+
+    if let Some(date_val) = resp.headers().get("date") {
+        if let Ok(date_str) = date_val.to_str() {
+            if let Ok(parsed) = httpdate::parse_http_date(date_str) {
+                let net_ms = parsed
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(local_mid);
+                let offset = (net_ms as i64) - (local_mid as i64);
+                return Ok(NetworkTimeInfo {
+                    network_timestamp: net_ms,
+                    local_timestamp: local_mid,
+                    offset_ms: offset,
+                    rtt_ms: rtt,
+                });
+            }
+        }
+    }
+
+    Ok(NetworkTimeInfo {
+        network_timestamp: local_mid,
+        local_timestamp: local_mid,
+        offset_ms: 0,
+        rtt_ms: rtt,
+    })
+}
+
+// ---------- 本地网络延迟测试 ----------
+
+#[tauri::command]
+async fn test_local_network_ping(app: AppHandle) -> LocalPingInfo {
+    let client = app.state::<HttpState>().client().clone();
+    let target = "https://1.1.1.1/cdn-cgi/trace";
+    let start = Instant::now();
+    let res = client
+        .get(target)
+        .timeout(Duration::from_secs(4))
+        .send()
+        .await;
+
+    match res {
+        Ok(r) => {
+            let lat = start.elapsed().as_millis() as u64;
+            LocalPingInfo {
+                ok: r.status().is_success(),
+                latency_ms: Some(lat),
+                target: "1.1.1.1 (Cloudflare)".into(),
+                error: None,
+            }
+        }
+        Err(e) => LocalPingInfo {
+            ok: false,
+            latency_ms: None,
+            target: "1.1.1.1 (Cloudflare)".into(),
+            error: Some(format!("测速失败: {e}")),
+        },
+    }
+}
+
 // ---------- Tauri 命令 ----------
 
 #[tauri::command]
@@ -519,7 +625,9 @@ pub fn run() {
             save_endpoints_cmd,
             get_settings,
             save_settings_cmd,
-            ping_models
+            ping_models,
+            get_network_time,
+            test_local_network_ping
         ])
         .run(tauri::generate_context!())
         .expect("error while running AI Ping");

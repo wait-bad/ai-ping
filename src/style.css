@@ -38,7 +38,7 @@ body {
 
 /* ============ 侧栏 ============ */
 #sidebar {
-  width: 250px;
+  width: 260px;
   background: var(--panel);
   border-right: 1px solid var(--border);
   display: flex;
@@ -139,13 +139,102 @@ body {
 .ep-name { font-size: 13.5px; font-weight: 600; line-height: 1.25; word-break: break-all; }
 .ep-sub { font-size: 11px; color: var(--dim); margin-top: 2px; }
 
-.side-foot {
+/* ============ 左下角状态栏与时间/网络诊断区 ============ */
+.side-status-box {
   padding: 12px 14px;
-  font-size: 11px;
-  color: var(--dim);
-  line-height: 1.5;
+  background: rgba(11, 15, 25, 0.5);
   border-top: 1px solid var(--border);
-  opacity: 0.75;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.time-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.time-item {
+  display: flex;
+  flex-direction: column;
+}
+.time-lbl {
+  font-size: 10.5px;
+  color: var(--dim);
+}
+.time-val {
+  font-family: Consolas, "Cascadia Code", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 1px;
+}
+.local-time {
+  color: var(--acc2);
+}
+.net-time {
+  color: var(--acc);
+}
+
+.time-diff-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.diff-lbl {
+  color: var(--dim);
+}
+.diff-val {
+  font-family: Consolas, monospace;
+  font-weight: 600;
+  color: var(--dim);
+}
+.diff-val.ok {
+  color: var(--ok);
+}
+.diff-val.warn {
+  color: var(--warn);
+}
+.diff-val.bad {
+  color: var(--bad);
+}
+
+.diag-action-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+.diag-btn {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.diag-btn:hover {
+  background: rgba(94, 234, 212, 0.12);
+  border-color: rgba(94, 234, 212, 0.3);
+  color: var(--acc);
+}
+.diag-btn:active {
+  transform: scale(0.97);
+}
+
+.ping-badge {
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ok);
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 /* ============ 主区 ============ */
